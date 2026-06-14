@@ -1,0 +1,150 @@
+.shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  background: #0b0f15;
+  color: #e7ecf3;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.brand-mark {
+  font-size: 38px;
+}
+
+.brand strong,
+.brand-about,
+.history-open span,
+.history-open small,
+.participant-card span,
+.participant-card strong,
+.participant-card small {
+  display: block;
+}
+
+.brand-about,
+.muted,
+.section-heading p,
+.topbar p,
+.history-item small,
+.participant-card small,
+.response small,
+.progress-card small,
+.composer-panel p {
+  color: #9aa6b5;
+}
+
+.brand-about {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.brand-about:hover {
+  color: #dce5ef;
+}
+
+.nav {
+  display: grid;
+  gap: 8px;
+}
+
+.nav button,
+.history-open {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: #e7ecf3;
+  border-color: transparent;
+}
+
+.nav button.active,
+.history-item:hover {
+  background: #18202c;
+  border-color: #303a49;
+}
+
+.history {
+  min-height: 0;
+  overflow: auto;
+  flex: 1;
+}
+
+.history h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #aab4c3;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: stretch;
+  margin-bottom: 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.history-open {
+  height: auto;
+  padding: 10px;
+}
+
+.history-delete {
+  min-height: 0;
+  padding: 0 8px;
+  font-size: 0.78rem;
+  color: #ff9a92;
+  background: transparent;
+  border-color: transparent;
+}
+
+.workspace {
+  min-width: 0;
+  max-width: 100%;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: auto;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #2a323f;
+  padding-bottom: 18px;
+}
+
+.topbar h1,
+.section-heading h2,
+.welcome h2 {
+  margin: 0;
+}
+
+.topbar p,
+.section-heading p,
+.welcome p {
+  margin: 4px 0 0;
+}

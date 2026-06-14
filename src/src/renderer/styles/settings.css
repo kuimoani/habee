@@ -1,0 +1,79 @@
+.settings-layout {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.provider-list {
+  display: grid;
+  gap: 14px;
+}
+
+.provider-editor {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.provider-help {
+  border: 1px solid #303a49;
+  border-radius: 8px;
+  padding: 12px;
+  background: #111820;
+}
+
+.provider-help p {
+  margin: 0 0 8px;
+  color: #b9c3d1;
+}
+
+.provider-help a {
+  color: #72dec8;
+}
+
+.provider-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, auto) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.provider-summary strong,
+.provider-summary p {
+  display: block;
+  margin: 0;
+}
+
+.provider-summary p,
+.provider-summary span,
+.provider-note {
+  color: #9aa6b5;
+}
+
+.provider-summary span {
+  text-align: right;
+}
+
+.minimal-provider-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.editor-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.test-result {
+  color: #b9c3d1;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .editor-row {
+    grid-template-columns: 1fr;
+  }
+}

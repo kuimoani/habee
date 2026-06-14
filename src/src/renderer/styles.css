@@ -1,0 +1,427 @@
+@import "./styles/base.css";
+@import "./styles/layout.css";
+@import "./styles/settings.css";
+
+.panel,
+.settings-layout,
+.welcome,
+.conversation-strip,
+.round,
+.progress-panel,
+.composer-panel {
+  background: #151b24;
+  border: 1px solid #2a323f;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.welcome {
+  align-self: start;
+  width: 100%;
+}
+
+.select-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 18px 0 12px;
+}
+
+.compact-heading {
+  margin-top: 22px;
+}
+
+.selected-participants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.preset-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.preset-picker label {
+  display: grid;
+  gap: 7px;
+}
+
+.participant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  border: 1px solid #303a49;
+  background: #10161f;
+  border-radius: 999px;
+  padding: 6px 8px 6px 12px;
+}
+
+.participant-chip button {
+  min-height: 24px;
+  padding: 0 7px;
+}
+
+.coordinator-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin: 12px 0 18px;
+}
+
+.mode-note {
+  display: block;
+  color: #9aa6b5;
+}
+
+.participant-card,
+.progress-card,
+.provider-editor {
+  border: 1px solid #2a323f;
+  background: #10161f;
+  border-radius: 8px;
+}
+
+.participant-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+}
+
+.progress-panel {
+  margin-top: 16px;
+}
+
+.progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.progress-card {
+  padding: 14px;
+}
+
+.progress-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.progress-card header span {
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #242c38;
+  color: #b9c3d1;
+  font-size: 0.8rem;
+}
+
+.progress-card.running {
+  border-color: #b8892e;
+  background: #211a0f;
+}
+
+.progress-card.running header span {
+  background: #3a2b10;
+  color: #ffd36a;
+}
+
+.progress-card.completed {
+  border-color: #2f8f7f;
+  background: #10241f;
+}
+
+.progress-card.completed header span {
+  background: #16352f;
+  color: #72dec8;
+}
+
+.progress-card.failed {
+  border-color: #a7473d;
+  background: #2a1413;
+}
+
+.progress-card.failed header span {
+  background: #4a1f1c;
+  color: #ff9a92;
+}
+
+.progress-card p {
+  margin: 8px 0 4px;
+}
+
+.prompt-box,
+.provider-editor label,
+.settings-layout label {
+  display: grid;
+  gap: 7px;
+}
+
+.prompt-box span,
+.provider-editor label span,
+.settings-layout label span {
+  font-weight: 700;
+}
+
+.prompt-input {
+  display: flex;
+  gap: 10px;
+}
+
+textarea,
+input,
+select {
+  width: 100%;
+  border: 1px solid #3a4250;
+  background: #0f141c;
+  color: #e7ecf3;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.between {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chat-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: start;
+  min-width: 0;
+}
+
+.conversation-flow {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.message {
+  background: #151b24;
+  border: 1px solid #2a323f;
+  border-left: 3px solid #58c7b3;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.message strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.message-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  color: #9aa6b5;
+  font-size: 0.85rem;
+}
+
+.message-meta b {
+  color: #dce5ef;
+  font-weight: 600;
+}
+
+.message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.decision-card {
+  display: grid;
+  gap: 12px;
+}
+
+.decision-card > div {
+  border: 1px solid #2a323f;
+  border-radius: 8px;
+  padding: 12px;
+  background: #10161f;
+}
+
+.decision-card.agreed > div:first-child {
+  border-color: #2f8f7f;
+  background: #10241f;
+}
+
+.decision-card.pending > div:first-child {
+  border-color: #b8892e;
+  background: #211a0f;
+}
+
+.decision-card span {
+  display: block;
+  color: #9aa6b5;
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+}
+
+.decision-card p {
+  margin: 0;
+}
+
+.round {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.round-title {
+  border-bottom: 1px solid #2a323f;
+  margin-bottom: 14px;
+}
+
+.round-title h3 {
+  margin: 0 0 10px;
+}
+
+.responses {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+  padding-bottom: 8px;
+  overscroll-behavior-x: contain;
+}
+
+.response {
+  flex: 0 0 min(420px, 86vw);
+  border: 1px solid #2a323f;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #10161f;
+}
+
+.response header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #151b24;
+  border-bottom: 1px solid #2a323f;
+}
+
+.response .markdown-body {
+  max-height: 300px;
+  overflow: auto;
+}
+
+.response.failed {
+  border-color: #a7473d;
+}
+
+.error {
+  color: #ff8b81;
+  padding: 14px;
+  margin: 0;
+}
+
+.composer-panel p {
+  margin: 4px 0 12px;
+}
+
+.markdown-body {
+  padding: 14px;
+  color: #e7ecf3;
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  margin: 0.9em 0 0.4em;
+  line-height: 1.2;
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body blockquote,
+.markdown-body pre {
+  margin: 0.65em 0;
+}
+
+.markdown-body code {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  background: #242c38;
+  border-radius: 4px;
+  padding: 0.12em 0.3em;
+}
+
+.markdown-body pre {
+  background: #090d13;
+  color: #e7ecf3;
+  border-radius: 6px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.markdown-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid #58c7b3;
+  padding-left: 12px;
+  color: #b9c3d1;
+}
+
+.progress-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.progress-heading h2,
+.progress-heading p {
+  margin: 0;
+}
+
+.empty-state {
+  border: 1px dashed #3a4250;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    min-height: auto;
+  }
+
+}

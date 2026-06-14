@@ -1,0 +1,75 @@
+:root {
+  color: #e7ecf3;
+  background: #0f131a;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #495365 #111720;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #111720;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #495365;
+  border: 2px solid #111720;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #657185;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #0f131a;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #3a4250;
+  background: #1a202b;
+  color: #e7ecf3;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #718096;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.primary {
+  background: #2f8f7f;
+  border-color: #2f8f7f;
+  color: #ffffff;
+}
+
+.danger {
+  color: #ff8b81;
+}

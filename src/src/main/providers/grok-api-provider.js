@@ -1,0 +1,32 @@
+import { createOpenAI } from "@ai-sdk/openai";
+import { BaseApiProvider } from "./base-api-provider.js";
+
+const DEFAULT_BASE_URL = "https://api.x.ai/v1";
+const TEST_MODEL_ORDER = ["grok-3-mini", "grok-3", "grok-4"];
+
+export class GrokApiProvider extends BaseApiProvider {
+  createModel(participant) {
+    return this.client()(participant.modelId);
+  }
+
+  testModels() {
+    const models = this.config.models || [];
+    return [...models].sort((left, right) => this.modelRank(left?.id) - this.modelRank(right?.id));
+  }
+
+  client() {
+    return createOpenAI({
+      apiKey: this.config.api?.apiKey,
+      baseURL: this.baseUrl()
+    });
+  }
+
+  baseUrl() {
+    return String(this.config.api?.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  }
+
+  modelRank(modelId) {
+    const index = TEST_MODEL_ORDER.indexOf(modelId);
+    return index < 0 ? TEST_MODEL_ORDER.length : index;
+  }
+}
