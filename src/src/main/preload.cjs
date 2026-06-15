@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("habee", {
   getState: () => ipcRenderer.invoke("habee:get-state"),
   saveSettings: (settings) => ipcRenderer.invoke("habee:save-settings", settings),
+  showSettingsFile: () => ipcRenderer.invoke("habee:show-settings-file"),
   loadConversation: (conversationId) => ipcRenderer.invoke("habee:load-conversation", conversationId),
   saveConversation: (conversation) => ipcRenderer.invoke("habee:save-conversation", conversation),
   deleteConversation: (conversationId) => ipcRenderer.invoke("habee:delete-conversation", conversationId),

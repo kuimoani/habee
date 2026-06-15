@@ -26,6 +26,8 @@ Habee is useful when you want to:
 
 ![Habee screenshot](images/screenshot3.png)
 
+![Habee screenshot](images/screenshot4.png)
+
 ## Main Features
 
 - Multi-AI agreement workflow.

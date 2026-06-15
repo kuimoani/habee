@@ -82,6 +82,23 @@
   border-color: #303a49;
 }
 
+.nav button.warning {
+  color: #ffaaa4;
+}
+
+.nav-alert {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #d75b54;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .history {
   min-height: 0;
   overflow: auto;

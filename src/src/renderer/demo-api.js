@@ -4,7 +4,6 @@ export function createBrowserDemoApi() {
   const settingsKey = "habee-demo-settings";
   const conversationsKey = "habee-demo-conversations";
   const defaultSettings = {
-    coordinator: { mode: "user", participantKey: "" },
     providers: [
       demoProvider("demo-codex", "codex", "Codex Demo", "cli", "codex exec --skip-git-repo-check {{prompt}}", "openai", "codex-demo"),
       demoProvider("demo-claude", "claude", "Claude Demo", "cli", "claude -p {{prompt}}", "anthropic", "claude-demo")
@@ -30,6 +29,9 @@ export function createBrowserDemoApi() {
     async saveSettings(settings) {
       write(settingsKey, settings);
       return settings;
+    },
+    async showSettingsFile() {
+      return { ok: true };
     },
     async loadConversation(conversationId) {
       return read(conversationsKey, []).find((item) => item.id === conversationId) || null;
@@ -64,21 +66,21 @@ export function createBrowserDemoApi() {
     },
     async evaluateConsensus(payload) {
       const roundCount = payload.conversation?.rounds?.length || 0;
-      const participant = coordinatorParticipant(payload, read(settingsKey, defaultSettings));
+      const participant = reviewerParticipant(payload, read(settingsKey, defaultSettings));
       if (participant) {
         const now = new Date().toISOString();
-        this.progressCallback?.({ progressId: payload.progressId, type: "participant-started", roundIndex: roundCount + 1, roundType: "coordinator", participantId: participant.id, providerId: participant.providerConfigId, displayName: participant.displayName, startedAt: now });
+        this.progressCallback?.({ progressId: payload.progressId, type: "participant-started", roundIndex: roundCount + 1, roundType: "reviewer", participantId: participant.id, providerId: participant.providerConfigId, displayName: participant.displayName, startedAt: now });
         await wait(250);
-        this.progressCallback?.({ progressId: payload.progressId, type: "participant-finished", roundIndex: roundCount + 1, roundType: "coordinator", participantId: participant.id, providerId: participant.providerConfigId, displayName: participant.displayName, status: "completed", responseMs: 250, completedAt: new Date().toISOString() });
+        this.progressCallback?.({ progressId: payload.progressId, type: "participant-finished", roundIndex: roundCount + 1, roundType: "reviewer", participantId: participant.id, providerId: participant.providerConfigId, displayName: participant.displayName, status: "completed", responseMs: 250, completedAt: new Date().toISOString() });
       }
       const agreed = roundCount >= 2;
       return {
         agreed,
-        summary: agreed ? "Demo coordinator found that the demo answers have converged." : "",
+        summary: agreed ? "Demo consensus reviewer found that the demo answers have converged." : "",
         finalAnswer: agreed ? "Demo final answer placeholder." : "",
         agreedPoints: agreed ? ["The demo participants share the same recommendation."] : [],
         remainingRisks: [],
-        reason: agreed ? "Demo coordinator accepts the agreement after two rounds." : "Demo coordinator asks for one more round.",
+        reason: agreed ? "Demo consensus reviewer accepts the agreement after two rounds." : "Demo consensus reviewer suggests one more round.",
         instruction: agreed ? "" : "Compare the prior answers and converge on a single final recommendation."
       };
     },
@@ -110,11 +112,9 @@ export function createBrowserDemoApi() {
         createdAt: now,
         updatedAt: now,
         participants: payload.participants,
-        coordinator: payload.coordinator || { mode: "user", participantKey: "" },
+        reviewer: payload.reviewer || payload.coordinator || null,
         messages: [{ id: `message-${Date.now()}`, role: "user", content: payload.prompt, createdAt: now }],
-        rounds: [{ id: `round-a-${Date.now()}`, index: 1, type: "initial-answer", prompt: payload.prompt, responses }],
-        summaries: [],
-        userSelectedResult: null
+        rounds: [{ id: `round-a-${Date.now()}`, index: 1, type: "initial-answer", responses }]
       };
       await this.saveConversation(conversation);
       return conversation;
@@ -136,7 +136,7 @@ export function createBrowserDemoApi() {
         createdAt: now,
         kind: payload.instructionKind || "round-instruction",
         roundIndex,
-        coordinator: conversation.coordinator || null
+        reviewer: conversation.reviewer || conversation.coordinator || null
       });
       emit({ type: "round-started", roundIndex, roundType: "review" });
       for (const participant of conversation.participants) {
@@ -147,7 +147,7 @@ export function createBrowserDemoApi() {
         emit({ type: "participant-finished", roundIndex, roundType: "review", participantId: participant.id, providerId: participant.providerConfigId, displayName: participant.displayName, status: "completed", responseMs: 400, completedAt: new Date().toISOString() });
         return response(participant, `## ${participant.displayName} demo review ${index + 1}\n\nThis review compares prior answers and recommends the strongest final opinion.`, now);
       });
-      conversation.rounds.push({ id: `round-${Date.now()}`, index: roundIndex, type: "review", prompt: payload.extraPrompt || "Review prior answers.", responses });
+      conversation.rounds.push({ id: `round-${Date.now()}`, index: roundIndex, type: "review", responses });
       conversation.updatedAt = now;
       emit({ type: "run-completed" });
       await this.saveConversation(conversation);
@@ -185,8 +185,8 @@ function availableDemoParticipants(settings) {
     })));
 }
 
-function coordinatorParticipant(payload, settings) {
-  const participantKey = payload.conversation?.coordinator?.participantKey;
+function reviewerParticipant(payload, settings) {
+  const participantKey = payload.conversation?.reviewer?.participantKey || payload.conversation?.coordinator?.participantKey;
   const participants = [
     ...(payload.conversation?.participants || []),
     ...availableDemoParticipants(settings)

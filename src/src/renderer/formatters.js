@@ -13,9 +13,9 @@ export function rawErrorMessage(error) {
   return error?.message || String(error);
 }
 
-export function coordinatorDisplayName(coordinator) {
-  if (!coordinator || coordinator.mode !== "ai") return "Manual";
-  return coordinator.displayName || "Unknown AI coordinator";
+export function reviewerDisplayName(reviewer) {
+  if (!reviewer) return "No reviewer";
+  return reviewer.displayName || "Unknown consensus reviewer";
 }
 
 export function consensusDetailsFromMessage(message) {
@@ -65,7 +65,7 @@ export function statusLabel(status) {
 }
 
 export function roundLabel(index, type) {
-  if (type === "coordinator") return "Coordinator / Consensus Check";
+  if (type === "coordinator" || type === "reviewer") return "Consensus Reviewer / Agreement Check";
   return `Round ${index} / ${type === "initial-answer" ? "Initial Answer" : "Peer Review"}`;
 }
 

@@ -11,6 +11,10 @@ export class BaseProvider {
     throw new Error("Provider call is not implemented.");
   }
 
+  async healthCheck() {
+    throw new Error("Provider health check is not implemented.");
+  }
+
   timeoutMs() {
     return Number(this.config.timeoutMs || DEFAULT_TIMEOUT_MS);
   }

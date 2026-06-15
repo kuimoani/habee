@@ -6,4 +6,8 @@ export class ClaudeCliProvider extends BaseCliProvider {
   commandLine() {
     return super.commandLine() || DEFAULT_COMMAND_LINE;
   }
+
+  healthCheckCommand() {
+    return ["claude", "auth", "status"];
+  }
 }

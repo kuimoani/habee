@@ -39,10 +39,6 @@ const grokModels = [
 ];
 
 const defaultSettings = {
-  coordinator: {
-    mode: "user",
-    participantKey: ""
-  },
   providers: [
     {
       id: "codex-cli",
@@ -126,7 +122,7 @@ export class JsonStore {
           createdAt: conversation.createdAt,
           updatedAt: conversation.updatedAt,
           participants: conversation.participants ?? [],
-          userSelectedResult: conversation.userSelectedResult ?? null
+          reviewer: conversation.reviewer || conversation.coordinator || null
         });
       }
     }
@@ -139,12 +135,12 @@ export class JsonStore {
 
   async saveConversation(conversation) {
     const now = new Date().toISOString();
-    const next = {
+    const next = compactConversation({
       ...conversation,
       id: conversation.id || crypto.randomUUID(),
       createdAt: conversation.createdAt || now,
       updatedAt: now
-    };
+    });
     await this.writeJson(this.conversationFile(next.id), next);
     return next;
   }
@@ -174,7 +170,6 @@ export class JsonStore {
 function normalizeSettings(settings) {
   return {
     ...settings,
-    coordinator: settings.coordinator || defaultSettings.coordinator,
     providers: (settings.providers || []).map(normalizeProvider)
   };
 }
@@ -271,4 +266,17 @@ function shouldUseDefaultModels(models) {
   if (!Array.isArray(models) || models.length === 0) return true;
   if (models.length !== 1) return false;
   return ["codex-default", "claude-sonnet", "default"].includes(models[0]?.id);
+}
+
+function compactConversation(conversation) {
+  const { summaries, userSelectedResult, coordinator, ...rest } = conversation;
+  const reviewer = rest.reviewer || coordinator || null;
+  return {
+    ...rest,
+    ...(reviewer ? { reviewer } : {}),
+    rounds: (rest.rounds || []).map((round) => {
+      const { prompt, ...roundRest } = round;
+      return roundRest;
+    })
+  };
 }

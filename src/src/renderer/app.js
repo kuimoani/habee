@@ -8,12 +8,12 @@ import { createBrowserDemoApi } from "./demo-api.js";
 import {
   aiDisplayName,
   consensusDetailsFromMessage,
-  coordinatorDisplayName,
   cryptoId,
   elapsedLabel,
   formatDate,
   formatDuration,
   rawErrorMessage,
+  reviewerDisplayName,
   roundLabel,
   statusLabel,
   withParticipantAlias
@@ -44,8 +44,8 @@ class HabeeApp extends LitElement {
     providerTestExpanded: { state: true },
     roundInstruction: { state: true },
     participantToAdd: { state: true },
-    coordinatorMode: { state: true },
-    coordinatorParticipantKey: { state: true },
+    reviewerParticipantKey: { state: true },
+    showContinueAfterAgreement: { state: true },
     stopRequested: { state: true },
     providerPresetToAdd: { state: true },
     showAbout: { state: true }
@@ -73,8 +73,8 @@ class HabeeApp extends LitElement {
     this.providerTestExpanded = {};
     this.roundInstruction = "";
     this.participantToAdd = "";
-    this.coordinatorMode = "user";
-    this.coordinatorParticipantKey = "";
+    this.reviewerParticipantKey = "";
+    this.showContinueAfterAgreement = false;
     this.stopRequested = false;
     this.providerPresetToAdd = providerPresets[0]?.id || "";
     this.showAbout = false;
@@ -106,6 +106,8 @@ class HabeeApp extends LitElement {
     this.settings = state.settings;
     this.settingsDraft = structuredClone(state.settings);
     this.conversations = state.conversations;
+    this.ensurePresetSelection();
+    this.runStartupProviderChecks();
   }
 
   render() {
@@ -122,7 +124,9 @@ class HabeeApp extends LitElement {
           <nav class="nav">
             <button class=${classMap({ active: this.view === "new" })} @click=${this.openNewChat}>+ New Chat</button>
             <button class=${classMap({ active: this.view === "chat" })} @click=${() => this.view = "chat"}>Conversation</button>
-            <button class=${classMap({ active: this.view === "settings" })} @click=${this.openSettings}>Settings</button>
+            <button class=${classMap({ active: this.view === "settings", warning: this.hasProviderProblems() })} @click=${this.openSettings}>
+              Settings ${this.hasProviderProblems() ? html`<span class="nav-alert">!</span>` : ""}
+            </button>
           </nav>
           <section class="history">
             <h2>History</h2>
@@ -201,17 +205,24 @@ class HabeeApp extends LitElement {
 
       <section class="panel">
         <div class="section-heading">
-          <h2>Prompt</h2>
-          <p>Choose who coordinates this request, then write the prompt.</p>
+          <h2>Consensus Reviewer</h2>
+          <p>Choose one model to evaluate agreement status, reasons, agreed points, and remaining risks after each round.</p>
         </div>
-        ${this.renderCoordinatorControl()}
+        ${this.renderReviewerControl()}
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <h2>Prompt</h2>
+          <p>Write the request that every participant should answer.</p>
+        </div>
         <label class="prompt-box">
           <span>Prompt</span>
           <div class="prompt-input">
             <textarea
               rows="5"
               placeholder="Enter the request that multiple AIs should answer and review."
-              value=${this.prompt}
+              .value=${this.prompt}
               @input=${this.updatePrompt}
             ></textarea>
             <button class="primary" ?disabled=${!this.canRun()} @click=${this.runAgreement}>
@@ -225,19 +236,17 @@ class HabeeApp extends LitElement {
     `;
   }
 
-  renderCoordinatorControl() {
+  renderReviewerControl() {
     const participants = this.availableParticipants();
     return html`
-      <div class="coordinator-box">
+      <div class="reviewer-box">
         <label>
-          <span>Coordinator</span>
-          <select .value=${this.coordinatorValue()} ?disabled=${this.isRunning} @change=${this.selectCoordinator}>
-            <option value="manual">Manual</option>
+          <span>Consensus Reviewer</span>
+          <select .value=${this.reviewerParticipantKey} ?disabled=${this.isRunning} @change=${this.selectReviewer}>
+            <option value="">Select a reviewer</option>
             ${participants.map((item) => html`<option value=${item.key}>${item.displayName}</option>`)}
           </select>
-          <small class="mode-note">${this.coordinatorMode === "ai"
-            ? "AI coordinator mode automatically checks for agreement after each round and continues until consensus, a stop request, or the safety round limit."
-            : "Manual mode waits for you to decide when to continue each round."}</small>
+          <small class="mode-note">The reviewer does not run the next round. It only evaluates whether the current answers have converged.</small>
         </label>
       </div>
     `;
@@ -248,7 +257,7 @@ class HabeeApp extends LitElement {
       return html`
         <section class="welcome">
           <h2>Compare multiple AI answers in one place</h2>
-          <p>Start a new chat to collect answers, reviews, summaries, and a final user-selected result.</p>
+          <p>Start a new chat to collect answers, reviews, consensus checks, and a final agreement trail.</p>
           <button class="primary" @click=${this.openNewChat}>Start New Chat</button>
         </section>
       `;
@@ -265,6 +274,7 @@ class HabeeApp extends LitElement {
           <div class="section-heading">
             <h2>Participants</h2>
             <p>${participants.map((item, index) => item.displayName || withParticipantAlias(item, index).displayName).join(", ")}</p>
+            <p class="muted">Consensus Reviewer: ${this.reviewerName()}</p>
           </div>
         </div>
 
@@ -279,11 +289,10 @@ class HabeeApp extends LitElement {
     const messages = this.activeConversation.messages || [];
     const rounds = this.activeConversation.rounds || [];
     const initialMessage = messages.find((message) => message.role === "user" && !message.kind);
-    const roundInstructions = messages.filter((message) => ["round-instruction", "coordinator-instruction"].includes(message.kind));
-    const coordinatorMessages = messages.filter((message) => message.kind === "coordinator-decision");
+    const roundInstructions = messages.filter((message) => message.kind === "round-instruction");
+    const reviewerMessages = messages.filter((message) => ["consensus-review", "coordinator-decision"].includes(message.kind));
     const instructionForRound = (round) => {
-      return roundInstructions.find((message) => message.roundIndex === round.index)
-        || roundInstructions[round.index - 2];
+      return roundInstructions.find((message) => message.roundIndex === round.index);
     };
 
     return html`
@@ -293,12 +302,12 @@ class HabeeApp extends LitElement {
           return html`
           ${round.index === 1 && initialMessage ? this.renderMessageBlock(initialMessage, "User request") : ""}
           ${round.index > 1 && instruction
-            ? this.renderMessageBlock(instruction, instruction.kind === "coordinator-instruction" ? "Coordinator instruction" : "User instruction")
+            ? this.renderMessageBlock(instruction, "Next round instruction")
             : ""}
           ${this.renderRound(round)}
-          ${coordinatorMessages
+          ${reviewerMessages
             .filter((message) => message.roundIndex === round.index)
-            .map((message) => this.renderMessageBlock(message, message.agreed ? "Agreement reached" : "Coordinator decision"))}
+            .map((message) => this.renderMessageBlock(message, message.agreed ? "Agreement reached" : "Consensus review"))}
         `;
         })}
       </div>
@@ -306,67 +315,53 @@ class HabeeApp extends LitElement {
   }
 
   renderMessageBlock(message, label) {
-    const showCoordinator = ["round-instruction", "coordinator-instruction", "coordinator-decision"].includes(message.kind);
-    const coordinatorLabel = coordinatorDisplayName(message.coordinator || this.activeConversation?.coordinator);
+    const showReviewer = ["consensus-review", "coordinator-decision"].includes(message.kind);
+    const reviewerLabel = reviewerDisplayName(message.reviewer || message.coordinator || this.activeConversation?.reviewer || this.activeConversation?.coordinator);
     return html`
       <article class="message ${message.role}">
         <strong>${label}</strong>
-        ${showCoordinator ? html`
+        ${showReviewer ? html`
           <div class="message-meta">
-            <span>Coordinator</span>
-            <b>${coordinatorLabel}</b>
+            <span>Consensus Reviewer</span>
+            <b>${reviewerLabel}</b>
           </div>
         ` : ""}
-        ${message.kind === "coordinator-decision"
-          ? this.renderCoordinatorDecision(message)
+        ${["consensus-review", "coordinator-decision"].includes(message.kind)
+          ? this.renderReviewerDecision(message)
           : html`<p>${message.content}</p>`}
       </article>
     `;
   }
 
-  renderCoordinatorDecision(message) {
+  renderReviewerDecision(message) {
     const details = consensusDetailsFromMessage(message);
     if (!details) return html`<p>${message.content}</p>`;
     return html`
       <div class="decision-card ${details.agreed ? "agreed" : "pending"}">
-        <div>
+        <div class="decision-status">
           <span>Status</span>
           <strong>${details.agreed ? "Agreement reached" : "More discussion needed"}</strong>
         </div>
-        ${details.reason ? html`
-          <div>
+        <div class="decision-main">
+          ${details.reason ? html`<section>
             <span>Reason</span>
             <p>${details.reason}</p>
-          </div>
-        ` : ""}
-        ${details.summary ? html`
-          <div>
-            <span>Agreement summary</span>
+          </section>` : ""}
+          ${details.summary ? html`<section>
+            <span>Summary</span>
             <p>${details.summary}</p>
-          </div>
-        ` : ""}
-        ${details.finalAnswer ? html`
-          <div>
-            <span>Agreed final answer</span>
-            <div class="markdown-body compact">${unsafeHTML(renderMarkdown(details.finalAnswer))}</div>
-          </div>
-        ` : ""}
+          </section>` : ""}
+        </div>
         ${details.agreedPoints?.length ? html`
-          <div>
+          <div class="decision-list agreed-points">
             <span>Agreed points</span>
             <ul>${details.agreedPoints.map((item) => html`<li>${item}</li>`)}</ul>
           </div>
         ` : ""}
         ${details.remainingRisks?.length ? html`
-          <div>
+          <div class="decision-list remaining-risks">
             <span>Remaining risks</span>
             <ul>${details.remainingRisks.map((item) => html`<li>${item}</li>`)}</ul>
-          </div>
-        ` : ""}
-        ${!details.agreed && details.instruction ? html`
-          <div>
-            <span>Next instruction</span>
-            <p>${details.instruction}</p>
           </div>
         ` : ""}
       </div>
@@ -387,13 +382,16 @@ class HabeeApp extends LitElement {
   }
 
   renderRunProgress() {
+    const isReviewerRun = this.isReviewerRun();
     return html`
-      <section class="progress-panel">
+      <section class="progress-panel ${isReviewerRun ? "reviewer-progress" : "participant-progress"}">
         <div class="section-heading">
           <div class="progress-heading">
             <div>
-              <h2>Provider Execution Status</h2>
-              <p>Each provider runs in parallel within a round. Default timeout is 2 minutes per provider call.</p>
+              <h2>${isReviewerRun ? "Consensus Reviewer Checking" : "AI Participants Thinking"}</h2>
+              <p>${isReviewerRun
+                ? "The selected reviewer is evaluating agreement status, reasons, agreed points, and remaining risks."
+                : "Selected participants are answering in parallel for this round. Default timeout is 2 minutes per provider call."}</p>
             </div>
             ${this.isRunning ? html`<button class="danger" @click=${this.stopAgreement}>Stop</button>` : ""}
           </div>
@@ -419,6 +417,10 @@ class HabeeApp extends LitElement {
         </div>
       </section>
     `;
+  }
+
+  isReviewerRun() {
+    return this.runProgress.some((item) => String(item.roundLabel || "").includes("Consensus Reviewer"));
   }
 
   renderProviderTerminal(providerId, displayName) {
@@ -458,31 +460,57 @@ class HabeeApp extends LitElement {
   }
 
   renderResponse(response) {
+    const name = this.participantName(response.participantId);
+    const color = participantColor(name);
+    const logId = `response-error-${response.participantId}-${response.startedAt || response.completedAt || ""}`;
     return html`
-      <article class="response ${response.status}">
+      <article class="response ${response.status}" style="--participant-color: ${color}; --participant-soft-color: ${softParticipantColor(color)};">
         <header>
-          <strong>${this.participantName(response.participantId)}</strong>
+          <strong>${name}</strong>
           ${response.status === "completed" ? html`
             <small>Completed / ${formatDuration(response.responseMs)}</small>
           ` : html`<small>Failed / ${formatDuration(response.responseMs)}</small>`}
         </header>
         ${response.status === "completed"
           ? html`<div class="markdown-body">${unsafeHTML(renderMarkdown(response.content))}</div>`
-          : html`<p class="error">${response.error}</p>`}
+          : html`
+            <div class="response-error-summary">Provider returned an error.</div>
+            <habee-provider-log
+              title="Show Error"
+              label=${name}
+              .content=${response.error || "Unknown error"}
+              .expanded=${Boolean(this.terminalExpanded[logId])}
+              @toggle=${() => this.toggleTerminal(logId)}
+              @clear=${() => {}}
+            ></habee-provider-log>
+          `}
       </article>
     `;
   }
 
   renderRoundComposer() {
+    if (this.isRunning && this.isReviewerRun()) {
+      return this.renderRunProgress();
+    }
+    const latestReview = this.latestConsensusReview();
+    if (latestReview?.agreed && !this.showContinueAfterAgreement) {
+      return html`
+        <section class="composer-panel compact-composer">
+          <div>
+            <strong>Agreement reached</strong>
+            <p>The consensus reviewer marked this discussion as complete. You can still continue manually.</p>
+          </div>
+          <button @click=${() => this.showContinueAfterAgreement = true}>Continue anyway</button>
+        </section>
+      `;
+    }
+
     return html`
       <section class="composer-panel">
         <div>
           <strong>Continue agreement?</strong>
-          <p>${this.activeConversation?.coordinator?.mode === "ai"
-            ? "AI coordinator mode continues automatically while it is running. You can still add a manual round after it stops."
-            : "Add optional instructions for the next round, then ask every AI to review the prior answers."}</p>
+          <p>Add optional instructions for the next round. The consensus reviewer suggestion may already be filled in, but you decide what to send.</p>
         </div>
-        ${this.renderCoordinatorControl()}
         <textarea
           rows="3"
           placeholder="Optional instruction for the next round"
@@ -499,45 +527,63 @@ class HabeeApp extends LitElement {
     `;
   }
 
+  latestConsensusReview() {
+    const messages = this.activeConversation?.messages || [];
+    return [...messages].reverse().find((message) => ["consensus-review", "coordinator-decision"].includes(message.kind));
+  }
+
   renderSettings() {
     const draft = this.settingsDraft || { providers: [] };
+    const addablePresets = this.addableProviderPresets(draft.providers);
+    const selectedPreset = addablePresets.find((preset) => preset.id === this.providerPresetToAdd) || addablePresets[0];
     return html`
       <section class="settings-layout">
-        <div class="section-heading">
-          <h2>Provider Management</h2>
-          <p>Add ready-made providers. CLI providers use your local login, and API providers only need an API key.</p>
+        <div class="settings-section provider-add-section">
+          <div class="section-heading">
+            <h2>Add Provider</h2>
+            <p>Add a ready-made provider once. CLI providers use local login; API providers need an API key.</p>
+          </div>
+          <div class="preset-picker">
+            <label>
+              <span>Provider preset</span>
+              <select .value=${selectedPreset?.id || ""} ?disabled=${addablePresets.length === 0} @change=${(event) => this.providerPresetToAdd = event.target.value}>
+                ${["CLI", "API"].map((group) => {
+                  const groupPresets = addablePresets.filter((preset) => preset.group === group);
+                  return groupPresets.length ? html`
+                    <optgroup label=${group}>
+                      ${groupPresets.map((preset) => html`<option value=${preset.id}>${preset.label}</option>`)}
+                    </optgroup>
+                  ` : "";
+                })}
+              </select>
+            </label>
+            <button ?disabled=${addablePresets.length === 0} @click=${this.addProviderFromPreset}>Add Provider</button>
+          </div>
+          ${addablePresets.length === 0 ? html`<p class="muted">All provider presets have already been added.</p>` : ""}
         </div>
 
-        <div class="preset-picker">
-          <label>
-            <span>Add Provider</span>
-            <select .value=${this.providerPresetToAdd} @change=${(event) => this.providerPresetToAdd = event.target.value}>
-              ${["CLI", "API"].map((group) => html`
-                <optgroup label=${group}>
-                  ${providerPresets
-                    .filter((preset) => preset.group === group)
-                    .map((preset) => html`<option value=${preset.id}>${preset.label}</option>`)}
-                </optgroup>
-              `)}
-            </select>
-          </label>
-          <button @click=${this.addProviderFromPreset}>Add</button>
-        </div>
-
-        <div class="provider-list">
-          ${repeat(draft.providers, (provider) => provider.id, (provider, index) => html`
-            <article class="provider-editor">
-              ${providerHelp(provider)}
+        <div class="settings-section configured-provider-section">
+          <div class="section-heading">
+            <h2>Configured Providers</h2>
+            <p>Health checks do not send prompts. CLI checks run a local status command, and API checks validate the key against provider metadata endpoints.</p>
+          </div>
+          <div class="provider-list">
+            ${draft.providers.length === 0 ? html`<p class="muted">No providers configured.</p>` : repeat(draft.providers, (provider) => provider.id, (provider, index) => {
+              const state = this.providerTestState(provider.id);
+              return html`
+            <article class="provider-editor ${state.status}">
               <div class="provider-summary">
                 <div>
                   <strong>${provider.displayName}</strong>
                   <p>${provider.mode === "cli" ? "CLI provider" : "API provider"}</p>
+                  <p class="model-list">${this.providerModelNames(provider)}</p>
                 </div>
-                <span>${(provider.models || []).map((model) => model.displayName || model.id).join(", ")}</span>
+                <span class="health-pill ${state.status}">${state.label}</span>
               </div>
+              ${providerHelp(provider)}
 
               ${provider.mode === "cli" ? html`
-                <p class="provider-note">No setup required here. Make sure this CLI is installed and already logged in on this machine.</p>
+                <p class="provider-note">Local CLI check only. No prompt is sent.</p>
               ` : html`
                 <div class="minimal-provider-settings">
                   <label>
@@ -548,19 +594,21 @@ class HabeeApp extends LitElement {
               `}
 
               <div class="actions between">
-                <span class="test-result">${this.testResults[provider.id] || ""}</span>
+                <span class="test-result">${state.message}</span>
                 <div>
-                  <button @click=${() => this.testProvider(provider)}>Test</button>
+                  <button @click=${() => this.testProvider(provider)}>Check</button>
                   <button class="danger" @click=${() => this.removeProvider(index)}>Del</button>
                 </div>
               </div>
               ${provider.mode === "cli" ? this.renderProviderTerminal(provider.id, provider.displayName) : ""}
               ${provider.mode === "api" ? this.renderProviderTestLog(provider.id, provider.displayName) : ""}
             </article>
-          `)}
+          `;})}
+          </div>
         </div>
 
         <div class="actions">
+          <button @click=${this.showSettingsFile}>Open Settings JSON</button>
           <button class="primary" @click=${this.saveSettings}>Save Settings</button>
         </div>
       </section>
@@ -569,6 +617,46 @@ class HabeeApp extends LitElement {
 
   availableParticipants() {
     return this.availableParticipantsFromSettings(this.settings);
+  }
+
+  addableProviderPresets(providers = []) {
+    return providerPresets.filter((preset) => !providers.some((provider) => sameProviderPreset(provider, preset)));
+  }
+
+  ensurePresetSelection() {
+    const addable = this.addableProviderPresets(this.settingsDraft?.providers || []);
+    if (!addable.some((preset) => preset.id === this.providerPresetToAdd)) {
+      this.providerPresetToAdd = addable[0]?.id || "";
+    }
+  }
+
+  providerTestState(providerId) {
+    const state = this.testResults[providerId];
+    if (!state) return { status: "unknown", label: "Not checked", message: "" };
+    if (typeof state === "string") return { status: "unknown", label: state, message: state };
+    return state;
+  }
+
+  providerModelNames(provider) {
+    return (provider.models || [])
+      .map((model) => model.displayName || model.id)
+      .filter(Boolean)
+      .join(", ") || "No models";
+  }
+
+  hasProviderProblems() {
+    return Object.values(this.testResults || {}).some((state) => {
+      const normalized = typeof state === "string" ? { status: "unknown" } : state;
+      return normalized?.status === "error";
+    });
+  }
+
+  runStartupProviderChecks() {
+    for (const provider of this.settings.providers || []) {
+      if (provider.enabled !== false) {
+        this.testProvider(provider, { silent: true });
+      }
+    }
   }
 
   availableParticipantsFromSettings(settings) {
@@ -601,8 +689,8 @@ class HabeeApp extends LitElement {
     this.prompt = "";
     this.selectedParticipantKeys = this.recentParticipantKeys();
     this.participantToAdd = "";
-    this.coordinatorMode = "user";
-    this.coordinatorParticipantKey = "";
+    this.reviewerParticipantKey = this.recentReviewerKey();
+    this.showContinueAfterAgreement = false;
     this.runProgress = [];
     this.terminalLogs = [];
     this.statusText = "Select participants and enter a prompt";
@@ -614,6 +702,13 @@ class HabeeApp extends LitElement {
     return (recent?.participants || [])
       .map((participant) => `${participant.providerConfigId}:${participant.modelId}`)
       .filter((key, index, array) => availableKeys.has(key) && array.indexOf(key) === index);
+  }
+
+  recentReviewerKey() {
+    const availableKeys = new Set(this.availableParticipants().map((item) => item.key));
+    const recent = (this.conversations || []).find((conversation) => conversation.reviewer?.participantKey || conversation.coordinator?.participantKey);
+    const key = recent?.reviewer?.participantKey || recent?.coordinator?.participantKey || "";
+    return availableKeys.has(key) ? key : "";
   }
 
   openSettings = () => {
@@ -643,40 +738,27 @@ class HabeeApp extends LitElement {
   canRun() {
     return !this.isRunning
       && this.prompt.trim()
-      && this.selectedParticipantKeys.length > 0;
+      && this.selectedParticipantKeys.length > 0
+      && this.reviewerParticipantKey;
   }
 
-  coordinatorValue() {
-    return this.coordinatorMode === "ai" && this.coordinatorParticipantKey
-      ? this.coordinatorParticipantKey
-      : "manual";
-  }
-
-  selectCoordinator = (event) => {
+  selectReviewer = (event) => {
     if (this.isRunning) return;
-    const value = event.target.value;
-    if (value === "manual") {
-      this.coordinatorMode = "user";
-      this.coordinatorParticipantKey = "";
-      this.applyCoordinatorToActiveConversation();
-      return;
-    }
-    this.coordinatorMode = "ai";
-    this.coordinatorParticipantKey = value;
-    this.applyCoordinatorToActiveConversation();
+    this.reviewerParticipantKey = event.target.value;
+    this.applyReviewerToActiveConversation();
   };
 
-  applyCoordinatorToActiveConversation() {
+  applyReviewerToActiveConversation() {
     if (!this.activeConversation) return;
     this.activeConversation = {
       ...this.activeConversation,
-      coordinator: this.currentCoordinatorPayload()
+      reviewer: this.currentReviewerPayload()
     };
   }
 
-  coordinatorName() {
-    const coordinator = this.activeConversation?.coordinator;
-    if (!coordinator || coordinator.mode === "user") return "Manual";
+  reviewerName() {
+    const reviewer = this.activeConversation?.reviewer || this.activeConversation?.coordinator;
+    if (!reviewer) return "No reviewer";
     const candidates = [
       ...(this.activeConversation?.participants || []).map((participant) => ({
         key: participant.key || `${participant.providerConfigId}:${participant.modelId}`,
@@ -684,8 +766,8 @@ class HabeeApp extends LitElement {
       })),
       ...this.availableParticipants()
     ];
-    return candidates.find((item) => item.key === coordinator.participantKey)?.displayName
-      || coordinator.displayName
+    return candidates.find((item) => item.key === reviewer.participantKey)?.displayName
+      || reviewer.displayName
       || "Unknown model";
   }
 
@@ -726,17 +808,15 @@ class HabeeApp extends LitElement {
         progressId: this.progressId,
         prompt: this.prompt,
         participants,
-        coordinator: this.currentCoordinatorPayload(),
+        reviewer: this.currentReviewerPayload(),
         settings: this.settings
       });
       this.activeConversation = conversation;
       this.view = "chat";
       if (this.stopRequested) {
         this.statusText = "Agreement stopped";
-      } else if (this.coordinatorMode === "ai") {
-        await this.runAutoAgreementLoop();
       } else {
-        this.statusText = "Round 1 completed. Continue when you are ready.";
+        await this.evaluateReviewerOnce();
       }
       const state = await habeeApi.getState();
       this.conversations = state.conversations;
@@ -823,7 +903,8 @@ class HabeeApp extends LitElement {
 
   async loadConversation(conversationId) {
     this.activeConversation = await habeeApi.loadConversation(conversationId);
-    this.syncCoordinatorFromConversation();
+    this.syncReviewerFromConversation();
+    this.showContinueAfterAgreement = false;
     this.view = "chat";
     this.statusText = "Loaded saved conversation";
   }
@@ -866,7 +947,7 @@ class HabeeApp extends LitElement {
         progressId: this.progressId,
         conversation: {
           ...this.activeConversation,
-          coordinator: this.currentCoordinatorPayload()
+          reviewer: this.currentReviewerPayload()
         },
         extraPrompt: this.roundInstruction,
         settings: this.settings
@@ -874,8 +955,8 @@ class HabeeApp extends LitElement {
       this.activeConversation = conversation;
       this.roundInstruction = "";
       this.statusText = `Round ${nextRoundIndex} completed. Continue or choose a final opinion.`;
-      if (this.activeConversation.coordinator?.mode === "ai" && !this.stopRequested) {
-        await this.runAutoAgreementLoop();
+      if (!this.stopRequested) {
+        await this.evaluateReviewerOnce();
       }
       const state = await habeeApi.getState();
       this.conversations = state.conversations;
@@ -886,83 +967,56 @@ class HabeeApp extends LitElement {
     }
   };
 
-  runAutoAgreementLoop = async () => {
-    const maxRounds = 8;
-    while (!this.stopRequested && (this.activeConversation?.rounds || []).length < maxRounds) {
-      const nextRoundIndex = (this.activeConversation.rounds || []).length + 1;
-      const coordinatorParticipant = this.coordinatorParticipant();
-      this.runProgress = coordinatorParticipant ? [{
-        participantId: coordinatorParticipant.id,
-        providerConfigId: coordinatorParticipant.providerConfigId,
-        displayName: coordinatorParticipant.displayName,
-        status: "queued",
-        roundIndex: nextRoundIndex,
-        roundLabel: "Coordinator / Consensus Check",
-        startedAt: null,
-        completedAt: null,
-        responseMs: null,
-        usage: null,
-        error: null
-      }] : [];
-      this.statusText = "Coordinator is checking whether everyone agrees";
-      this.scrollWorkspaceToBottom();
+  evaluateReviewerOnce = async () => {
+    if (!this.activeConversation) return;
+    const activeReviewer = this.activeConversation.reviewer || this.activeConversation.coordinator;
+    if (!activeReviewer?.participantKey) return;
+    const checkedRoundIndex = this.activeConversation.rounds?.length || 0;
+    const reviewerParticipant = this.reviewerParticipant();
+    this.runProgress = reviewerParticipant ? [{
+      participantId: reviewerParticipant.id,
+      providerConfigId: reviewerParticipant.providerConfigId,
+      displayName: reviewerParticipant.displayName,
+      status: "queued",
+      roundIndex: checkedRoundIndex,
+      roundLabel: "Consensus Reviewer / Agreement Check",
+      startedAt: null,
+      completedAt: null,
+      responseMs: null,
+      usage: null,
+      error: null
+    }] : [];
+    this.statusText = "Consensus reviewer is checking whether everyone agrees";
+    this.scrollWorkspaceToBottom();
 
-      const decision = await habeeApi.evaluateConsensus({
-        progressId: this.progressId,
-        conversation: this.activeConversation,
-        settings: this.settings
-      });
-
-      if (this.stopRequested) break;
-      this.appendCoordinatorDecision(decision);
-      if (decision.agreed) {
-        this.statusText = "Coordinator completed the agreement";
-        break;
-      }
-
-      this.runProgress = (this.activeConversation.participants || []).map((participant) => ({
-        participantId: participant.id,
-        providerConfigId: participant.providerConfigId,
-        displayName: participant.displayName,
-        status: "queued",
-        roundIndex: nextRoundIndex,
-        roundLabel: `Round ${nextRoundIndex} / Peer Review`,
-        startedAt: null,
-        completedAt: null,
-        responseMs: null,
-        usage: null,
-        error: null
-      }));
-      this.statusText = `Coordinator requested Round ${nextRoundIndex}`;
-      this.scrollWorkspaceToBottom();
-
-      this.activeConversation = await habeeApi.continueAgreement({
-        progressId: this.progressId,
-        conversation: {
-          ...this.activeConversation,
-          coordinator: this.currentCoordinatorPayload()
-        },
-        extraPrompt: decision.instruction || "Continue the agreement discussion and resolve remaining disagreements.",
-        instructionKind: "coordinator-instruction",
-        settings: this.settings
-      });
-      const state = await habeeApi.getState();
-      this.conversations = state.conversations;
-    }
+    const decision = await habeeApi.evaluateConsensus({
+      progressId: this.progressId,
+      conversation: {
+        ...this.activeConversation,
+        reviewer: this.currentReviewerPayload()
+      },
+      settings: this.settings
+    });
 
     if (this.stopRequested) {
       this.statusText = "Agreement stopped";
-    } else if ((this.activeConversation?.rounds || []).length >= maxRounds) {
-      this.statusText = `Stopped after ${maxRounds} rounds. Review the conversation before continuing.`;
+      return;
     }
-    if (this.activeConversation) {
-      this.activeConversation = await habeeApi.saveConversation(this.activeConversation);
-      const state = await habeeApi.getState();
-      this.conversations = state.conversations;
+
+    this.appendReviewerDecision(decision);
+    if (!decision.agreed && decision.instruction && !this.roundInstruction.trim()) {
+      this.roundInstruction = decision.instruction;
     }
+    this.showContinueAfterAgreement = false;
+    this.activeConversation = await habeeApi.saveConversation(this.activeConversation);
+    const state = await habeeApi.getState();
+    this.conversations = state.conversations;
+    this.statusText = decision.agreed
+      ? "Consensus reviewer marked the agreement as reached."
+      : "Consensus reviewer suggested a next instruction. Start the next round when you are ready.";
   };
 
-  appendCoordinatorDecision(decision) {
+  appendReviewerDecision(decision) {
     if (!this.activeConversation) return;
     const roundIndex = this.activeConversation.rounds?.length || 0;
     const content = decision.content || [
@@ -975,12 +1029,12 @@ class HabeeApp extends LitElement {
       messages: [
         ...(this.activeConversation.messages || []),
         {
-          id: `coordinator-${Date.now()}-${roundIndex}`,
+          id: `reviewer-${Date.now()}-${roundIndex}`,
           role: "assistant",
-          kind: "coordinator-decision",
+          kind: "consensus-review",
           agreed: Boolean(decision.agreed),
           roundIndex,
-          coordinator: this.activeConversation.coordinator || this.currentCoordinatorPayload(),
+          reviewer: this.activeConversation.reviewer || this.currentReviewerPayload(),
           summary: decision.summary || "",
           finalAnswer: decision.finalAnswer || "",
           agreedPoints: decision.agreedPoints || [],
@@ -996,33 +1050,23 @@ class HabeeApp extends LitElement {
     };
   }
 
-  currentCoordinatorPayload() {
-    if (this.coordinatorMode !== "ai") {
-      return { mode: "user", participantKey: "", displayName: "Manual" };
-    }
-    const coordinator = this.availableParticipants().find((item) => item.key === this.coordinatorParticipantKey);
+  currentReviewerPayload() {
+    const reviewer = this.availableParticipants().find((item) => item.key === this.reviewerParticipantKey);
     return {
-      mode: "ai",
-      participantKey: this.coordinatorParticipantKey,
-      displayName: coordinator?.displayName || ""
+      participantKey: this.reviewerParticipantKey,
+      displayName: reviewer?.displayName || ""
     };
   }
 
-  syncCoordinatorFromConversation() {
-    const coordinator = this.activeConversation?.coordinator;
-    if (!coordinator || coordinator.mode === "user") {
-      this.coordinatorMode = "user";
-      this.coordinatorParticipantKey = "";
-      return;
-    }
-    this.coordinatorMode = "ai";
-    this.coordinatorParticipantKey = coordinator.participantKey || "";
+  syncReviewerFromConversation() {
+    const reviewer = this.activeConversation?.reviewer || this.activeConversation?.coordinator;
+    this.reviewerParticipantKey = reviewer?.participantKey || "";
   }
 
-  coordinatorParticipant() {
-    const coordinator = this.activeConversation?.coordinator;
-    if (!coordinator || coordinator.mode !== "ai") return null;
-    return this.availableParticipants().find((item) => item.key === coordinator.participantKey) || null;
+  reviewerParticipant() {
+    const reviewer = this.activeConversation?.reviewer || this.activeConversation?.coordinator;
+    if (!reviewer?.participantKey) return null;
+    return this.availableParticipants().find((item) => item.key === reviewer.participantKey) || null;
   }
 
   stopAgreement = async () => {
@@ -1049,13 +1093,15 @@ class HabeeApp extends LitElement {
   }
 
   addProviderFromPreset = () => {
-    const preset = providerPresets.find((item) => item.id === this.providerPresetToAdd) || providerPresets[0];
+    const addable = this.addableProviderPresets(this.settingsDraft?.providers || []);
+    const preset = addable.find((item) => item.id === this.providerPresetToAdd) || addable[0];
     if (!preset) return;
     const provider = providerFromPreset(preset);
     this.settingsDraft = {
       ...this.settingsDraft,
       providers: [...this.settingsDraft.providers, provider]
     };
+    this.ensurePresetSelection();
   };
 
   removeProvider(index) {
@@ -1074,13 +1120,27 @@ class HabeeApp extends LitElement {
   saveSettings = async () => {
     this.settings = await habeeApi.saveSettings(this.settingsDraft);
     this.statusText = "Settings saved";
+    this.ensurePresetSelection();
+    this.runStartupProviderChecks();
   };
 
-  testProvider = async (provider) => {
+  showSettingsFile = async () => {
+    try {
+      await habeeApi.showSettingsFile?.();
+      this.statusText = "Settings JSON location opened";
+    } catch (error) {
+      this.statusText = rawErrorMessage(error);
+    }
+  };
+
+  testProvider = async (provider, options = {}) => {
     this.progressId = `test-${Date.now()}`;
     this.clearProviderLogs(provider.id);
     this.clearProviderTestLog(provider.id);
-    this.testResults = { ...this.testResults, [provider.id]: "Testing..." };
+    this.testResults = {
+      ...this.testResults,
+      [provider.id]: { status: "checking", label: "Checking", message: "Checking..." }
+    };
     const result = await habeeApi.testProvider({
       progressId: this.progressId,
       providerConfig: provider
@@ -1091,8 +1151,13 @@ class HabeeApp extends LitElement {
     };
     this.testResults = {
       ...this.testResults,
-      [provider.id]: result.ok ? "Test passed" : "Test failed. Open Log for details."
+      [provider.id]: result.ok
+        ? { status: "ok", label: "Ready", message: "Health check passed" }
+        : { status: "error", label: "Problem", message: "Health check failed. Open log for details." }
     };
+    if (!options.silent) {
+      this.statusText = result.ok ? `${provider.displayName} is ready` : `${provider.displayName} has a health check problem`;
+    }
   };
 
 }
@@ -1114,5 +1179,26 @@ function providerHelp(provider) {
   `;
 }
 
-customElements.define("habee-app", HabeeApp);
+function sameProviderPreset(provider, preset) {
+  if (provider.presetId && provider.presetId === preset.id) return true;
+  return provider.provider === preset.provider
+    && provider.mode === preset.mode
+    && (provider.displayName || "").toLowerCase() === preset.displayName.toLowerCase();
+}
 
+function participantColor(value) {
+  let hash = 0;
+  const text = String(value || "");
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(index);
+    hash |= 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue} 68% 58%)`;
+}
+
+function softParticipantColor(color) {
+  return color.replace("58%)", "18% / 0.42)");
+}
+
+customElements.define("habee-app", HabeeApp);

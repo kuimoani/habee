@@ -10,4 +10,8 @@ export class CodexCliProvider extends BaseCliProvider {
     }
     return commandLine;
   }
+
+  healthCheckCommand() {
+    return ["codex", "login", "status"];
+  }
 }

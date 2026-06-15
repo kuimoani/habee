@@ -31,6 +31,15 @@ export class GeminiApiProvider extends BaseApiProvider {
     return normalizeGeminiBaseUrl(this.config.api?.baseUrl || DEFAULT_BASE_URL);
   }
 
+  healthCheckUrl() {
+    const baseUrl = this.baseUrl() || "https://generativelanguage.googleapis.com/v1beta";
+    return `${baseUrl.replace(/\/+$/, "")}/models?key=${encodeURIComponent(this.config.api?.apiKey || "")}`;
+  }
+
+  healthCheckHeaders() {
+    return {};
+  }
+
   modelRank(modelId) {
     const index = TEST_MODEL_ORDER.indexOf(this.normalizeModelId(modelId));
     return index < 0 ? TEST_MODEL_ORDER.length : index;

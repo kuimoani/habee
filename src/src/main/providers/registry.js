@@ -12,7 +12,7 @@ export class ProviderRegistry {
       createdAt: payload.createdAt || now,
       updatedAt: now,
       participants: payload.participants,
-      coordinator: payload.coordinator || { mode: "user", participantKey: "" },
+      reviewer: payload.reviewer || payload.coordinator || null,
       messages: [
         {
           id: crypto.randomUUID(),
@@ -21,9 +21,7 @@ export class ProviderRegistry {
           createdAt: now
         }
       ],
-      rounds: [],
-      summaries: [],
-      userSelectedResult: null
+      rounds: []
     };
 
     onProgress({
@@ -72,7 +70,7 @@ export class ProviderRegistry {
       createdAt: now,
       kind: payload.instructionKind || "round-instruction",
       roundIndex: index,
-      coordinator: conversation.coordinator || null
+      reviewer: conversation.reviewer || conversation.coordinator || null
     });
 
     throwIfAborted(options.signal);
@@ -87,12 +85,6 @@ export class ProviderRegistry {
       signal: options.signal
     });
     conversation.rounds.push(round);
-    conversation.summaries = round.responses.map((response) => ({
-      id: crypto.randomUUID(),
-      participantId: response.participantId,
-      content: response.content || response.error || "",
-      createdAt: response.completedAt || new Date().toISOString()
-    }));
     conversation.updatedAt = new Date().toISOString();
 
     onProgress({
@@ -106,40 +98,40 @@ export class ProviderRegistry {
 
   async evaluateConsensus(payload, options = {}) {
     const onProgress = options.onProgress || (() => {});
-    const coordinator = buildCoordinatorParticipant(payload.conversation?.coordinator, payload.settings);
-    if (!coordinator) {
+    const reviewer = buildReviewerParticipant(payload.conversation?.reviewer || payload.conversation?.coordinator, payload.settings);
+    if (!reviewer) {
       return {
         agreed: false,
         instruction: "Continue the discussion and work toward a shared answer.",
-        reason: "Coordinator model was not found."
+        reason: "Consensus reviewer model was not found."
       };
     }
 
     const startedAt = new Date().toISOString();
     onProgress({
       type: "participant-started",
-      roundType: "coordinator",
+      roundType: "reviewer",
       roundIndex: (payload.conversation?.rounds || []).length + 1,
-      participantId: coordinator.id,
-      providerId: coordinator.providerConfigId,
-      displayName: coordinator.displayName,
+      participantId: reviewer.id,
+      providerId: reviewer.providerConfigId,
+      displayName: reviewer.displayName,
       startedAt
     });
 
     const response = await this.callParticipant(
-      coordinator,
+      reviewer,
       buildConsensusPrompt(payload.conversation),
       payload.settings,
-      { onProgress, participant: coordinator, signal: options.signal }
+      { onProgress, participant: reviewer, signal: options.signal }
     );
 
     onProgress({
       type: "participant-finished",
-      roundType: "coordinator",
+      roundType: "reviewer",
       roundIndex: (payload.conversation?.rounds || []).length + 1,
-      participantId: coordinator.id,
-      providerId: coordinator.providerConfigId,
-      displayName: coordinator.displayName,
+      participantId: reviewer.id,
+      providerId: reviewer.providerConfigId,
+      displayName: reviewer.displayName,
       status: response.status,
       error: response.error,
       responseMs: response.responseMs,
@@ -219,7 +211,6 @@ export class ProviderRegistry {
       id: roundId,
       index,
       type,
-      prompt,
       responses
     };
   }
@@ -254,34 +245,12 @@ export class ProviderRegistry {
   }
 
   async testProvider(providerConfig, options = {}) {
-    const prompt = "Reply with a short confirmation that this provider is working.";
     const provider = createProvider(providerConfig);
-    const models = provider.testModels();
-    const errors = [];
-
-    for (const model of models) {
-      const participant = {
-        id: `test-${providerConfig.id}-${model?.id || "default"}`,
-        providerConfigId: providerConfig.id,
-        modelId: model?.id,
-        displayName: model?.displayName || providerConfig.displayName
-      };
-      try {
-        const content = await provider.call(participant, prompt, { ...options, participant });
-        return {
-          ok: true,
-          content: `${participant.modelId}: ${content.text}`,
-          usage: content.usage
-        };
-      } catch (error) {
-        errors.push([
-          `----- ${participant.modelId || "default"} -----`,
-          rawErrorMessage(error)
-        ].join("\n"));
-      }
+    try {
+      return await provider.healthCheck(options);
+    } catch (error) {
+      return { ok: false, error: rawErrorMessage(error) };
     }
-
-    return { ok: false, error: errors.join("\n") || "No models are configured for this provider." };
   }
 }
 
@@ -332,9 +301,9 @@ function answersHeader(responses) {
   return responses || "No prior responses.";
 }
 
-function buildCoordinatorParticipant(coordinator, settings) {
-  if (!coordinator || coordinator.mode !== "ai" || !coordinator.participantKey) return null;
-  const [providerConfigId, ...modelParts] = String(coordinator.participantKey).split(":");
+function buildReviewerParticipant(reviewer, settings) {
+  if (!reviewer?.participantKey) return null;
+  const [providerConfigId, ...modelParts] = String(reviewer.participantKey).split(":");
   const modelId = modelParts.join(":");
   const providerConfig = settings.providers.find((provider) => provider.id === providerConfigId);
   if (!providerConfig || !modelId) return null;
@@ -348,7 +317,7 @@ function buildCoordinatorParticipant(coordinator, settings) {
     providerName: providerConfig.displayName || providerConfig.id,
     modelName: model?.displayName || modelId,
     baseName: aiDisplayName(model?.displayName || modelId, providerConfig.displayName || providerConfig.id),
-    displayName: coordinator.displayName || aiDisplayName(model?.displayName || modelId, providerConfig.displayName || providerConfig.id)
+    displayName: reviewer.displayName || aiDisplayName(model?.displayName || modelId, providerConfig.displayName || providerConfig.id)
   };
 }
 
@@ -368,11 +337,11 @@ function buildConsensusPrompt(conversation) {
   }).join("\n\n====================\n\n");
 
   return [
-    "You are the coordinator for a multi-AI agreement process.",
+    "You are the consensus reviewer for a multi-AI agreement process.",
     "Participant names may be referenced by full label, short label, or letter alias.",
     participantLegend(conversation.participants || []),
     "",
-    "Decide whether all participating AIs have substantially converged on the same final answer.",
+    "Evaluate whether all participating AIs have substantially converged on the same final answer.",
     "Return JSON only, with this exact shape:",
     "{\"agreed\": true|false, \"summary\": \"how the agreement was reached\", \"finalAnswer\": \"the agreed final answer when agreed is true\", \"agreedPoints\": [\"point\"], \"remainingRisks\": [\"risk\"], \"reason\": \"short reason\", \"instruction\": \"next-round instruction if agreed is false\"}",
     "Set agreed to true only when the participants no longer have meaningful disagreements or unresolved risks.",

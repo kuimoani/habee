@@ -6,4 +6,8 @@ export class GeminiCliProvider extends BaseCliProvider {
   commandLine() {
     return super.commandLine() || DEFAULT_COMMAND_LINE;
   }
+
+  healthCheckCommand() {
+    return ["gemini", "-p", "Hi"];
+  }
 }

@@ -116,6 +116,7 @@ export const providerPresets = [
 export function providerFromPreset(preset) {
   return {
     id: `${preset.id}-${Date.now()}`,
+    presetId: preset.id,
     provider: preset.provider,
     displayName: preset.displayName,
     mode: preset.mode,

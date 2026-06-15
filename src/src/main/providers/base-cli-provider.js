@@ -6,6 +6,15 @@ export class BaseCliProvider extends BaseProvider {
     return this.runCommand(prompt, options);
   }
 
+  async healthCheck(options = {}) {
+    const command = this.healthCheckCommand();
+    const result = await this.runRawCommand(command, options);
+    return {
+      ok: true,
+      content: result || `${this.config.displayName || this.config.id} CLI is available.`
+    };
+  }
+
   testModels() {
     return (this.config.models || []).slice(0, 1);
   }
@@ -97,6 +106,67 @@ export class BaseCliProvider extends BaseProvider {
 
   commandLine() {
     return this.config.cli?.commandLine || [this.config.cli?.command, ...(this.config.cli?.argsTemplate || [])].filter(Boolean).join(" ");
+  }
+
+  healthCheckCommand() {
+    const [command] = splitCommandLine(this.commandLine());
+    if (!command) throw new Error("CLI command is empty.");
+    return [command, "--version"];
+  }
+
+  runRawCommand([command, ...args], options = {}) {
+    if (!command) throw new Error("CLI command is empty.");
+    const onProgress = options.onProgress || (() => {});
+    const logBase = {
+      participantId: options.participant?.id,
+      displayName: options.participant?.displayName || this.config.displayName,
+      providerId: this.config.id
+    };
+
+    return new Promise((resolve, reject) => {
+      const child = spawn(command, args, {
+        shell: false,
+        windowsHide: true,
+        cwd: this.config.cli?.cwd || process.cwd(),
+        env: {
+          ...process.env,
+          NO_COLOR: "1",
+          CI: process.env.CI || "1"
+        }
+      });
+
+      let stdout = "";
+      let stderr = "";
+      const timeout = setTimeout(() => {
+        child.kill();
+        reject(new Error(`timeout ${Math.round(this.timeoutMs() / 1000)}s`));
+      }, Math.min(this.timeoutMs(), 30000));
+
+      child.stdout.on("data", (data) => {
+        const content = data.toString();
+        stdout += content;
+        onProgress({ type: "terminal-log", stream: "stdout", content, createdAt: new Date().toISOString(), ...logBase });
+      });
+      child.stderr.on("data", (data) => {
+        const content = data.toString();
+        stderr += content;
+        onProgress({ type: "terminal-log", stream: "stderr", content, createdAt: new Date().toISOString(), ...logBase });
+      });
+      child.on("error", (error) => {
+        clearTimeout(timeout);
+        onProgress({ type: "terminal-log", stream: "error", content: rawErrorMessage(error), createdAt: new Date().toISOString(), ...logBase });
+        reject(error);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timeout);
+        const output = [stdout.trim(), stderr.trim()].filter(Boolean).join("\n");
+        if (code !== 0) {
+          reject(new Error(output || String(code)));
+          return;
+        }
+        resolve(output);
+      });
+    });
   }
 }
 

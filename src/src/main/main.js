@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { JsonStore } from "./storage.js";
@@ -46,6 +46,11 @@ function registerIpc() {
 
   ipcMain.handle("habee:save-settings", async (_event, settings) => {
     return store.saveSettings(settings);
+  });
+
+  ipcMain.handle("habee:show-settings-file", async () => {
+    shell.showItemInFolder(store.settingsPath);
+    return { ok: true, path: store.settingsPath };
   });
 
   ipcMain.handle("habee:delete-conversation", async (_event, conversationId) => {

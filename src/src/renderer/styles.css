@@ -66,7 +66,7 @@
   padding: 0 7px;
 }
 
-.coordinator-box {
+.reviewer-box {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
@@ -251,24 +251,80 @@ textarea {
 
 .decision-card {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
-.decision-card > div {
+.decision-card > div,
+.decision-card section {
   border: 1px solid #2a323f;
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   background: #10161f;
 }
 
-.decision-card.agreed > div:first-child {
+.decision-card.agreed .decision-status {
   border-color: #2f8f7f;
   background: #10241f;
 }
 
-.decision-card.pending > div:first-child {
+.decision-card.pending .decision-status {
   border-color: #b8892e;
   background: #211a0f;
+}
+
+.decision-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.decision-status span {
+  margin: 0;
+}
+
+.decision-status strong {
+  font-size: 0.95rem;
+}
+
+.decision-main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.decision-list ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.decision-list li {
+  line-height: 1.35;
+}
+
+.agreed-points {
+  border-color: #246f61;
+  background: #0e211d;
+}
+
+.agreed-points span,
+.agreed-points li::marker {
+  color: #6de2bf;
+}
+
+.remaining-risks {
+  border-color: #743633;
+  background: #241211;
+}
+
+.remaining-risks span,
+.remaining-risks li::marker {
+  color: #ff8b81;
 }
 
 .decision-card span {
@@ -280,6 +336,19 @@ textarea {
 
 .decision-card p {
   margin: 0;
+}
+
+.reviewer-progress {
+  border-color: #6b5bbd;
+}
+
+.reviewer-progress .progress-card {
+  border-color: #6b5bbd;
+  background: #161428;
+}
+
+.participant-progress {
+  border-color: #2a323f;
 }
 
 .round {
@@ -308,7 +377,7 @@ textarea {
 
 .response {
   flex: 0 0 min(420px, 86vw);
-  border: 1px solid #2a323f;
+  border: 1px solid var(--participant-color, #2a323f);
   border-radius: 8px;
   overflow: hidden;
   background: #10161f;
@@ -319,8 +388,8 @@ textarea {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  background: #151b24;
-  border-bottom: 1px solid #2a323f;
+  background: var(--participant-soft-color, #151b24);
+  border-bottom: 1px solid var(--participant-color, #2a323f);
 }
 
 .response .markdown-body {
@@ -332,6 +401,14 @@ textarea {
   border-color: #a7473d;
 }
 
+.response-error-summary {
+  color: #ffaaa4;
+  padding: 12px;
+  border-bottom: 1px solid #3a2225;
+  background: #1b1012;
+  font-size: 0.9rem;
+}
+
 .error {
   color: #ff8b81;
   padding: 14px;
@@ -340,6 +417,17 @@ textarea {
 
 .composer-panel p {
   margin: 4px 0 12px;
+}
+
+.compact-composer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.compact-composer p {
+  margin-bottom: 0;
 }
 
 .markdown-body {

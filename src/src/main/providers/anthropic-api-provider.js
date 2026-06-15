@@ -25,6 +25,18 @@ export class AnthropicApiProvider extends BaseApiProvider {
     return String(this.config.api?.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, "");
   }
 
+  healthCheckUrl() {
+    const baseUrl = this.baseUrl() || "https://api.anthropic.com/v1";
+    return `${baseUrl.replace(/\/+$/, "")}/models`;
+  }
+
+  healthCheckHeaders(apiKey) {
+    return {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01"
+    };
+  }
+
   modelRank(modelId) {
     const index = TEST_MODEL_ORDER.indexOf(modelId);
     return index < 0 ? TEST_MODEL_ORDER.length : index;
