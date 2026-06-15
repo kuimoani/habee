@@ -1,5 +1,7 @@
 # Habee
 
+> Tired of untrustworthy AI answers due to hallucinations? Can't verify them yourself? What if AI could cross-check each other?
+
 Habee is a desktop app that helps multiple AI models discuss the same request and move toward an agreed answer.
 
 The name "Habee" means "agreement" in Korean.
@@ -93,30 +95,14 @@ Habee will be distributed as a zip file.
 ## How To Use
 
 1. Click `New Chat`.
-2. Choose a coordinator.
-   - `Manual`: you decide when to continue each round.
-   - AI model: the selected AI decides whether the discussion has reached agreement.
-3. Add two or more AI participants.
+2. Add two or more AI participants.
+3. Choose a consensus reviewer.
 4. Write your prompt.
 5. Click `Start Agreement`.
 6. Review each AI response.
 7. Continue the agreement if needed.
 8. Add extra instructions between rounds if you want to guide the discussion.
 9. When agreement is reached, review the final summary and agreed answer.
-
-## Coordinator Modes
-
-### Manual
-
-Manual mode lets you control the discussion.
-
-After each round, Habee waits for you to decide whether another round is needed. You can add extra instructions before starting the next round.
-
-### AI Coordinator
-
-AI coordinator mode lets one selected AI check the discussion after each round.
-
-The coordinator can decide whether agreement has been reached. If not, it can ask the participants to continue with a new instruction.
 
 ## License
 
