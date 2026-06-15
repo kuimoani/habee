@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "node scripts/dev.js",
     "build": "vite build",
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "npm run build && electron-builder --win"
   },
   "keywords": [
     "electron",
@@ -23,9 +24,35 @@
     "@ai-sdk/openai": "^3.0.71",
     "@rollup/rollup-win32-x64-msvc": "^4.61.1",
     "ai": "^6.0.204",
-    "electron": "^32.3.3",
     "lit": "^3.2.1",
     "marked": "^18.0.5",
     "vite": "^5.4.11"
+  },
+  "devDependencies": {
+    "electron": "^32.3.3",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.habee.app",
+    "productName": "Habee",
+    "directories": {
+      "output": "release"
+    },
+    "electronDist": "node_modules/electron/dist",
+    "files": [
+      "dist/**/*",
+      "src/main/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

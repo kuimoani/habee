@@ -89,7 +89,7 @@ export class HabeeAboutDialog extends LitElement {
         <div class="content">
           <p>Habee helps multiple AI providers answer the same request, review one another, and move toward an agreed result.</p>
           <dl>
-            <div><dt>Version</dt><dd>v0.1</dd></div>
+            <div><dt>Version</dt><dd>v0.1.0</dd></div>
             <div><dt>Creator</dt><dd>kuimoani</dd></div>
             <div><dt>GitHub</dt><dd><a href="https://github.com/kuimoani/habee" target="_blank" rel="noreferrer">https://github.com/kuimoani/habee</a></dd></div>
           </dl>
