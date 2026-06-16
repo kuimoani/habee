@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { BaseProvider, rawErrorMessage } from "./base-provider.js";
 
+const MAX_COMMAND_LINE_CHARS = 24000;
+
 export class BaseCliProvider extends BaseProvider {
   async call(_participant, prompt, options = {}) {
     return this.runCommand(prompt, options);
@@ -24,7 +26,7 @@ export class BaseCliProvider extends BaseProvider {
     const [command, ...argsTemplate] = splitCommandLine(commandLine);
     if (!command) throw new Error("CLI command is empty.");
 
-    const args = argsTemplate.map((arg) => String(arg).replaceAll("{{prompt}}", prompt));
+    const prepared = preparePromptInvocation(command, argsTemplate, prompt);
     const onProgress = options.onProgress || (() => {});
     const logBase = {
       participantId: options.participant?.id,
@@ -38,7 +40,17 @@ export class BaseCliProvider extends BaseProvider {
         return;
       }
 
-      const child = spawn(command, args, {
+      if (prepared.stdin) {
+        onProgress({
+          type: "terminal-log",
+          stream: "stdin",
+          content: `[Habee] Prompt is ${prepared.promptLength} characters. Sending prompt through stdin to avoid Windows command-line length limits.\n`,
+          createdAt: new Date().toISOString(),
+          ...logBase
+        });
+      }
+
+      const child = spawn(command, prepared.args, {
         shell: false,
         windowsHide: true,
         cwd: this.config.cli?.cwd || process.cwd(),
@@ -48,7 +60,11 @@ export class BaseCliProvider extends BaseProvider {
           CI: process.env.CI || "1"
         }
       });
-      child.stdin?.end();
+      if (prepared.stdin) {
+        child.stdin?.end(prepared.stdin);
+      } else {
+        child.stdin?.end();
+      }
 
       let stdout = "";
       let stderr = "";
@@ -168,6 +184,29 @@ export class BaseCliProvider extends BaseProvider {
       });
     });
   }
+}
+
+function preparePromptInvocation(command, argsTemplate, prompt) {
+  const promptText = String(prompt || "");
+  const argsWithPrompt = argsTemplate.map((arg) => String(arg).replaceAll("{{prompt}}", promptText));
+  if (commandLineLength(command, argsWithPrompt) <= MAX_COMMAND_LINE_CHARS) {
+    return { args: argsWithPrompt, stdin: "", promptLength: promptText.length };
+  }
+
+  return {
+    args: argsTemplate.flatMap((arg) => {
+      const text = String(arg);
+      if (!text.includes("{{prompt}}")) return [text];
+      const withoutPrompt = text.replaceAll("{{prompt}}", "").trim();
+      return withoutPrompt ? [withoutPrompt] : [];
+    }),
+    stdin: promptText,
+    promptLength: promptText.length
+  };
+}
+
+function commandLineLength(command, args) {
+  return [command, ...args].join(" ").length;
 }
 
 function splitCommandLine(commandLine) {

@@ -376,7 +376,7 @@ textarea {
 }
 
 .response {
-  flex: 0 0 min(420px, 86vw);
+  min-width: 460px;
   border: 1px solid var(--participant-color, #2a323f);
   border-radius: 8px;
   overflow: hidden;
@@ -387,13 +387,13 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 10px;
   background: var(--participant-soft-color, #151b24);
   border-bottom: 1px solid var(--participant-color, #2a323f);
 }
 
 .response .markdown-body {
-  max-height: 300px;
+  max-height: 600px;
   overflow: auto;
 }
 
